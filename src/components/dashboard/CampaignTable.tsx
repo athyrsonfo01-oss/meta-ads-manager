@@ -33,16 +33,25 @@ interface CampaignTableProps {
 
 type SortKey = keyof CampaignRow;
 
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Ativo",
+  PAUSED: "Pausado",
+  DELETED: "Deletado",
+  ARCHIVED: "Arquivado",
+  ORGANIC: "Orgânico",
+};
+
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, "success" | "warning" | "error" | "secondary"> = {
     ACTIVE: "success",
     PAUSED: "warning",
     DELETED: "error",
     ARCHIVED: "secondary",
+    ORGANIC: "secondary",
   };
   return (
     <Badge variant={variants[status] ?? "secondary"} className="text-xs">
-      {status === "ACTIVE" ? "Ativo" : status === "PAUSED" ? "Pausado" : status}
+      {STATUS_LABELS[status] ?? status}
     </Badge>
   );
 }
@@ -82,21 +91,23 @@ export function CampaignTable({ campaigns }: CampaignTableProps) {
 
   type ColDef = { key: SortKey; label: string; format: (v: CampaignRow) => React.ReactNode };
 
+  const isOrganic = (r: CampaignRow) => r.status === "ORGANIC";
+
   const baseCols: ColDef[] = [
     { key: "name", label: "Campanha", format: (r) => r.name },
     { key: "status", label: "Status", format: (r) => r.status },
-    { key: "spend", label: "Investimento", format: (r) => formatCurrency(r.spend) },
-    { key: "impressions", label: "Impressões", format: (r) => formatNumber(r.impressions) },
-    { key: "clicks", label: "Cliques", format: (r) => formatNumber(r.clicks) },
-    { key: "ctr", label: "CTR", format: (r) => formatPercent(r.ctr) },
-    { key: "cpm", label: "CPM", format: (r) => formatCurrency(r.cpm) },
-    { key: "cpc", label: "CPC", format: (r) => formatCurrency(r.cpc) },
+    { key: "spend", label: "Investimento", format: (r) => isOrganic(r) ? "-" : formatCurrency(r.spend) },
+    { key: "impressions", label: "Impressões", format: (r) => isOrganic(r) ? "-" : formatNumber(r.impressions) },
+    { key: "clicks", label: "Cliques", format: (r) => isOrganic(r) ? "-" : formatNumber(r.clicks) },
+    { key: "ctr", label: "CTR", format: (r) => isOrganic(r) ? "-" : formatPercent(r.ctr) },
+    { key: "cpm", label: "CPM", format: (r) => isOrganic(r) ? "-" : formatCurrency(r.cpm) },
+    { key: "cpc", label: "CPC", format: (r) => isOrganic(r) ? "-" : formatCurrency(r.cpc) },
     { key: "realLeads", label: "Leads", format: (r) => formatNumber(r.realLeads ?? 0) },
-    { key: "realCpl", label: "CPL", format: (r) => (r.realLeads ?? 0) > 0 ? formatCurrency(r.realCpl ?? 0) : "-" },
+    { key: "realCpl", label: "CPL", format: (r) => (r.realLeads ?? 0) > 0 && !isOrganic(r) ? formatCurrency(r.realCpl ?? 0) : "-" },
     { key: "realMqls", label: "MQLs", format: (r) => formatNumber(r.realMqls ?? 0) },
-    { key: "realCpmql", label: "CPMQL", format: (r) => (r.realMqls ?? 0) > 0 ? formatCurrency(r.realCpmql ?? 0) : "-" },
-    { key: "lpConversionRate", label: "Conv. LP", format: (r) => formatPercent(r.lpConversionRate) },
-    { key: "connectRate", label: "Connect Rate", format: (r) => formatPercent(r.connectRate) },
+    { key: "realCpmql", label: "CPMQL", format: (r) => (r.realMqls ?? 0) > 0 && !isOrganic(r) ? formatCurrency(r.realCpmql ?? 0) : "-" },
+    { key: "lpConversionRate", label: "Conv. LP", format: (r) => isOrganic(r) ? "-" : formatPercent(r.lpConversionRate) },
+    { key: "connectRate", label: "Connect Rate", format: (r) => isOrganic(r) ? "-" : formatPercent(r.connectRate) },
   ];
 
   const cols = baseCols;
@@ -123,7 +134,9 @@ export function CampaignTable({ campaigns }: CampaignTableProps) {
             {sorted.map((row) => (
               <tr
                 key={row.id}
-                className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors"
+                className={`border-b border-border last:border-0 hover:bg-secondary/20 transition-colors ${
+                  row.status === "ORGANIC" ? "bg-violet-500/5" : ""
+                }`}
               >
                 {cols.map((col) => (
                   <td key={col.key} className="px-4 py-3 whitespace-nowrap">

@@ -112,6 +112,25 @@ async function getDashboardData(period: string, since?: string, until?: string, 
     };
   });
 
+  // Adicionar linhas virtuais para origens sem campanha (ex: bio-instagram)
+  for (const [key, sheetData] of sheetMap) {
+    if (!key.startsWith("__origem__")) continue;
+    const origem = key.replace("__origem__", "");
+    const displayName = sheetData.displayName ?? origem;
+    campaigns.push({
+      id: key,
+      name: displayName,
+      status: "ORGANIC",
+      spend: 0, impressions: 0, clicks: 0, leads: 0, mqls: 0,
+      ctr: 0, cpc: 0, cpm: 0, cpl: 0, cpmql: 0,
+      lpConversionRate: 0, connectRate: 0, pageView: 0, buttonClick: 0,
+      realLeads: sheetData.leads,
+      realMqls: sheetData.mqls,
+      realCpl: 0,
+      realCpmql: 0,
+    });
+  }
+
   // Totais reais da planilha — soma TODOS os leads do período, independente de match com Meta
   let totalRealLeads = 0;
   let totalRealMqls = 0;

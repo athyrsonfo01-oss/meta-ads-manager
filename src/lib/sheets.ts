@@ -75,7 +75,7 @@ export interface CampaignSheetStats {
   totalMqls: number;
 }
 
-export async function fetchSheetLeads(since?: string, until?: string): Promise<Map<string, { leads: number; mqls: number }>> {
+export async function fetchSheetLeads(since?: string, until?: string): Promise<Map<string, { leads: number; mqls: number; displayName?: string }>> {
   try {
     const url = `https://docs.google.com/spreadsheets/d/${SHEETS_ID}/gviz/tq?tqx=out:csv&sheet=2026`;
     const res = await fetch(url, { cache: "no-store" });
@@ -91,11 +91,12 @@ export async function fetchSheetLeads(since?: string, until?: string): Promise<M
     const dataIdx         = header.findIndex(h => h === "data");
     const campanhaIdx     = header.findIndex(h => h === "campanha");
     const faturamentoIdx  = header.findIndex(h => h.includes("faturamento") || h.includes("faturmanto"));
+    const origemIdx       = header.findIndex(h => h === "origem");
 
     if (campanhaIdx === -1) return new Map();
 
     // Comparar datas como strings YYYY-MM-DD para evitar problemas de timezone
-    const map = new Map<string, { leads: number; mqls: number }>();
+    const map = new Map<string, { leads: number; mqls: number; displayName?: string }>();
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -114,12 +115,22 @@ export async function fetchSheetLeads(since?: string, until?: string): Promise<M
       const faturamento = (row[faturamentoIdx] || "").trim();
       const isMql = faturamento !== "" && faturamento !== "Menos de R$10 mil";
 
-      // Linhas sem campanha contam no total sob chave especial
       const rawCampanha = row[campanhaIdx] || "";
-      const key = rawCampanha ? normalizeSheetName(rawCampanha) : "__sem_campanha__";
+      let key: string;
+      let displayName: string | undefined;
 
-      const prev = map.get(key) ?? { leads: 0, mqls: 0 };
-      map.set(key, { leads: prev.leads + 1, mqls: prev.mqls + (isMql ? 1 : 0) });
+      if (rawCampanha) {
+        key = normalizeSheetName(rawCampanha);
+      } else {
+        // Sem campanha: usa a origem como linha separada
+        const rawOrigem = origemIdx >= 0 ? (row[origemIdx] || "").trim() : "";
+        const origem = normalizeSheetName(rawOrigem) || "desconhecida";
+        key = `__origem__${origem}`;
+        displayName = rawOrigem || "Desconhecida";
+      }
+
+      const prev = map.get(key) ?? { leads: 0, mqls: 0, displayName };
+      map.set(key, { leads: prev.leads + 1, mqls: prev.mqls + (isMql ? 1 : 0), displayName: prev.displayName ?? displayName });
     }
 
     return map;
