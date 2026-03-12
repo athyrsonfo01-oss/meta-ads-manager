@@ -87,7 +87,9 @@ async function getDashboardData(period: string, since?: string, until?: string, 
     }
   }
 
-  const campaigns = Array.from(campaignMap.values()).map((c: any) => {
+  const campaigns = Array.from(campaignMap.values()).filter((c: any) =>
+    c.spend > 0 || c.impressions > 0 || c.clicks > 0
+  ).map((c: any) => {
     // Buscar dados reais da planilha pelo nome normalizado
     // Tenta match exato; se não achar, remove sufixos como "— cópia", "- copia", etc.
     const normalizedName = normalizeSheetName(c.name);
