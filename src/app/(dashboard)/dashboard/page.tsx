@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { DashboardContent } from "./DashboardContent";
 import { DateFilter } from "@/components/dashboard/DateFilter";
+import { CampaignFilter } from "@/components/dashboard/CampaignFilter";
 import { Loader2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -18,19 +19,20 @@ const PERIOD_LABELS: Record<string, string> = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; since?: string; until?: string }>;
+  searchParams: Promise<{ period?: string; since?: string; until?: string; campaigns?: string }>;
 }) {
   const params = await searchParams;
   const since = params.since;
   const until = params.until;
   const period = params.period ?? "last_7d";
+  const campaignIds = params.campaigns ? params.campaigns.split(",").filter(Boolean) : undefined;
 
   const isCustom = !!since && !!until;
   const periodLabel = isCustom
     ? `${since} até ${until}`
     : (PERIOD_LABELS[period] ?? period);
 
-  const suspenseKey = isCustom ? `${since}-${until}` : period;
+  const suspenseKey = [isCustom ? `${since}-${until}` : period, params.campaigns ?? ""].join("|");
 
   return (
     <div>
@@ -41,7 +43,10 @@ export default async function DashboardPage({
             Performance das campanhas — {periodLabel}
           </p>
         </div>
-        <DateFilter current={period} since={since} until={until} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <CampaignFilter />
+          <DateFilter current={period} since={since} until={until} />
+        </div>
       </div>
 
       <Suspense
@@ -52,7 +57,7 @@ export default async function DashboardPage({
           </div>
         }
       >
-        <DashboardContent period={period} since={since} until={until} />
+        <DashboardContent period={period} since={since} until={until} campaignIds={campaignIds} />
       </Suspense>
     </div>
   );

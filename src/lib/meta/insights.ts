@@ -112,8 +112,8 @@ export function getActionValue(
 export function parseInsightMetrics(insight: MetaInsight) {
   const actions = insight.actions ?? [];
   const spend = parseFloat(insight.spend ?? "0");
-  const leads = getActionValue(actions, "lead") + getActionValue(actions, "onsite_conversion.lead_grouped");
-  const mqls = getActionValue(actions, "offsite_conversion.fb_pixel_custom.MQL");
+  const leads = getActionValue(actions, "lead");
+  const mqls = getActionValue(actions, "offsite_conversion.fb_pixel_custom");
   const pageView = getActionValue(actions, "landing_page_view");
   const buttonClick = getActionValue(actions, "offsite_conversion.fb_pixel_custom.ButtonClick");
   const clicks = parseInt(insight.clicks ?? "0", 10);

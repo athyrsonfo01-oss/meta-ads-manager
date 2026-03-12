@@ -7,6 +7,7 @@ import {
   BarChart3,
   TrendingUp,
   Activity,
+  FileSpreadsheet,
 } from "lucide-react";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { CampaignTable } from "@/components/dashboard/CampaignTable";
@@ -16,18 +17,33 @@ import {
   parseInsightMetrics,
   type DatePreset,
 } from "@/lib/meta/insights";
+import { fetchSheetLeads, periodToDateRange, normalizeSheetName } from "@/lib/sheets";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
-async function getDashboardData(period: string, since?: string, until?: string) {
+async function getDashboardData(period: string, since?: string, until?: string, campaignIds?: string[]) {
   const isCustom = !!since && !!until;
   const datePreset = isCustom ? undefined : (period as DatePreset);
 
-  const insights = await fetchInsights({
-    level: "campaign",
-    ...(isCustom ? { since, until } : { datePreset }),
-  });
+  // Calcular range de datas para a planilha
+  const dateRange = isCustom
+    ? { since: since!, until: until! }
+    : periodToDateRange(period);
 
-  // Totais agregados do período
+  // Buscar dados do Meta e da planilha em paralelo
+  const [insightsRaw, sheetMap] = await Promise.all([
+    fetchInsights({
+      level: "campaign",
+      ...(isCustom ? { since, until } : { datePreset }),
+    }),
+    fetchSheetLeads(dateRange.since, dateRange.until),
+  ]);
+
+  let insights = insightsRaw;
+  if (campaignIds && campaignIds.length > 0) {
+    insights = insights.filter((i) => i.campaign_id && campaignIds.includes(i.campaign_id));
+  }
+
+  // Totais agregados do período (Meta)
   const totals = insights.reduce(
     (acc, insight) => {
       const m = parseInsightMetrics(insight);
@@ -51,7 +67,7 @@ async function getDashboardData(period: string, since?: string, until?: string) 
   const lpConvRate = totals.pageView > 0 ? (totals.leads / totals.pageView) * 100 : 0;
   const connectRate = totals.clicks > 0 ? (totals.leads / totals.clicks) * 100 : 0;
 
-  // Dados por campanha para a tabela (agrega por campaign_id)
+  // Dados por campanha (agrega por campaign_id, mescla com planilha)
   const campaignMap = new Map<string, any>();
   for (const insight of insights) {
     const id = insight.campaign_id ?? "unknown";
@@ -72,16 +88,34 @@ async function getDashboardData(period: string, since?: string, until?: string) 
     }
   }
 
-  const campaigns = Array.from(campaignMap.values()).map((c: any) => ({
-    ...c,
-    ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
-    cpc: c.clicks > 0 ? c.spend / c.clicks : 0,
-    cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
-    cpl: c.leads > 0 ? c.spend / c.leads : 0,
-    cpmql: c.mqls > 0 ? c.spend / c.mqls : 0,
-    lpConversionRate: c.pageView > 0 ? (c.leads / c.pageView) * 100 : 0,
-    connectRate: c.clicks > 0 ? (c.leads / c.clicks) * 100 : 0,
-  }));
+  const campaigns = Array.from(campaignMap.values()).map((c: any) => {
+    // Buscar dados reais da planilha pelo nome normalizado
+    const normalizedName = normalizeSheetName(c.name);
+    const sheet = sheetMap.get(normalizedName);
+    const realLeads = sheet?.leads ?? 0;
+    const realMqls = sheet?.mqls ?? 0;
+
+    return {
+      ...c,
+      ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
+      cpc: c.clicks > 0 ? c.spend / c.clicks : 0,
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
+      cpl: c.leads > 0 ? c.spend / c.leads : 0,
+      cpmql: c.mqls > 0 ? c.spend / c.mqls : 0,
+      lpConversionRate: c.pageView > 0 ? (c.leads / c.pageView) * 100 : 0,
+      connectRate: c.clicks > 0 ? (c.leads / c.clicks) * 100 : 0,
+      realLeads,
+      realMqls,
+      realCpl: realLeads > 0 ? c.spend / realLeads : 0,
+      realCpmql: realMqls > 0 ? c.spend / realMqls : 0,
+    };
+  });
+
+  // Totais reais da planilha
+  const totalRealLeads = campaigns.reduce((s, c) => s + c.realLeads, 0);
+  const totalRealMqls = campaigns.reduce((s, c) => s + c.realMqls, 0);
+  const realCpl = totalRealLeads > 0 ? totals.spend / totalRealLeads : 0;
+  const realCpmql = totalRealMqls > 0 ? totals.spend / totalRealMqls : 0;
 
   // Série temporal para o gráfico
   const dailyMap = new Map<string, { spend: number; leads: number; mqls: number }>();
@@ -108,37 +142,62 @@ async function getDashboardData(period: string, since?: string, until?: string) 
 
   return {
     totals: { ...totals, ctr, cpc, cpm, cpl, cpmql, lpConvRate, connectRate },
+    realTotals: { leads: totalRealLeads, mqls: totalRealMqls, cpl: realCpl, cpmql: realCpmql },
     campaigns,
     chartData,
+    hasSheetData: sheetMap.size > 0,
   };
 }
 
-export async function DashboardContent({ period, since, until }: { period: string; since?: string; until?: string }) {
-  const { totals, campaigns, chartData } = await getDashboardData(period, since, until);
+export async function DashboardContent({ period, since, until, campaignIds }: { period: string; since?: string; until?: string; campaignIds?: string[] }) {
+  const { totals, realTotals, campaigns, chartData, hasSheetData } = await getDashboardData(period, since, until, campaignIds);
 
   const kpis = [
     { title: "Investimento Total", value: formatCurrency(totals.spend), icon: DollarSign, colorClass: "text-blue-400 bg-blue-400/10" },
     { title: "Impressões", value: formatNumber(totals.impressions), icon: Eye, colorClass: "text-purple-400 bg-purple-400/10" },
     { title: "Cliques no Link", value: formatNumber(totals.clicks), icon: MousePointerClick, colorClass: "text-cyan-400 bg-cyan-400/10" },
     { title: "Pageviews", value: formatNumber(totals.pageView), icon: Activity, colorClass: "text-indigo-400 bg-indigo-400/10" },
-    { title: "Leads", value: formatNumber(totals.leads), icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
-    { title: "MQLs", value: formatNumber(totals.mqls), icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
+    { title: "Leads (Meta)", value: formatNumber(totals.leads), icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
+    { title: "MQLs (Meta)", value: formatNumber(totals.mqls), icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
     { title: "CTR", value: formatPercent(totals.ctr), icon: BarChart3, colorClass: "text-amber-400 bg-amber-400/10" },
-    { title: "CPL", value: totals.leads > 0 ? formatCurrency(totals.cpl) : "-", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
-    { title: "CPMQL", value: totals.mqls > 0 ? formatCurrency(totals.cpmql) : "-", icon: TrendingUp, colorClass: "text-rose-400 bg-rose-400/10" },
+    { title: "CPL (Meta)", value: totals.leads > 0 ? formatCurrency(totals.cpl) : "-", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
+    { title: "CPMQL (Meta)", value: totals.mqls > 0 ? formatCurrency(totals.cpmql) : "-", icon: TrendingUp, colorClass: "text-rose-400 bg-rose-400/10" },
     { title: "CPM", value: formatCurrency(totals.cpm), icon: DollarSign, colorClass: "text-slate-400 bg-slate-400/10" },
     { title: "CPC", value: formatCurrency(totals.cpc), icon: MousePointerClick, colorClass: "text-violet-400 bg-violet-400/10" },
     { title: "Conv. LP", value: formatPercent(totals.lpConvRate), subtitle: "Leads / Pageviews", icon: BarChart3, colorClass: "text-green-400 bg-green-400/10" },
     { title: "Connect Rate", value: formatPercent(totals.connectRate), subtitle: "Leads / Cliques", icon: TrendingUp, colorClass: "text-pink-400 bg-pink-400/10" },
   ];
 
+  const realKpis = [
+    { title: "Leads Reais", value: formatNumber(realTotals.leads), subtitle: "Planilha", icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
+    { title: "MQLs Reais", value: formatNumber(realTotals.mqls), subtitle: "Planilha", icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
+    { title: "CPL Real", value: realTotals.leads > 0 ? formatCurrency(realTotals.cpl) : "-", subtitle: "Invest. / Leads reais", icon: TrendingUp, colorClass: "text-amber-400 bg-amber-400/10" },
+    { title: "CPMQL Real", value: realTotals.mqls > 0 ? formatCurrency(realTotals.cpmql) : "-", subtitle: "Invest. / MQLs reais", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* KPIs Meta */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {kpis.map((kpi) => (
           <KPICard key={kpi.title} {...kpi} />
         ))}
       </div>
+
+      {/* KPIs Reais da Planilha */}
+      {hasSheetData && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <FileSpreadsheet className="w-4 h-4 text-green-400" />
+            <h2 className="text-sm font-semibold text-green-400">Métricas Reais — Google Sheets</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {realKpis.map((kpi) => (
+              <KPICard key={kpi.title} {...kpi} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PerformanceChart
