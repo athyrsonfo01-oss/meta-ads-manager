@@ -7,7 +7,6 @@ import {
   BarChart3,
   TrendingUp,
   Activity,
-  FileSpreadsheet,
 } from "lucide-react";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { CampaignTable } from "@/components/dashboard/CampaignTable";
@@ -150,54 +149,31 @@ async function getDashboardData(period: string, since?: string, until?: string, 
 }
 
 export async function DashboardContent({ period, since, until, campaignIds }: { period: string; since?: string; until?: string; campaignIds?: string[] }) {
-  const { totals, realTotals, campaigns, chartData, hasSheetData } = await getDashboardData(period, since, until, campaignIds);
+  const { totals, realTotals, campaigns, chartData } = await getDashboardData(period, since, until, campaignIds);
 
   const kpis = [
     { title: "Investimento Total", value: formatCurrency(totals.spend), icon: DollarSign, colorClass: "text-blue-400 bg-blue-400/10" },
     { title: "Impressões", value: formatNumber(totals.impressions), icon: Eye, colorClass: "text-purple-400 bg-purple-400/10" },
     { title: "Cliques no Link", value: formatNumber(totals.clicks), icon: MousePointerClick, colorClass: "text-cyan-400 bg-cyan-400/10" },
     { title: "Pageviews", value: formatNumber(totals.pageView), icon: Activity, colorClass: "text-indigo-400 bg-indigo-400/10" },
-    { title: "Leads (Meta)", value: formatNumber(totals.leads), icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
-    { title: "MQLs (Meta)", value: formatNumber(totals.mqls), icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
+    { title: "Leads", value: formatNumber(realTotals.leads), icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
+    { title: "MQLs", value: formatNumber(realTotals.mqls), icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
     { title: "CTR", value: formatPercent(totals.ctr), icon: BarChart3, colorClass: "text-amber-400 bg-amber-400/10" },
-    { title: "CPL (Meta)", value: totals.leads > 0 ? formatCurrency(totals.cpl) : "-", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
-    { title: "CPMQL (Meta)", value: totals.mqls > 0 ? formatCurrency(totals.cpmql) : "-", icon: TrendingUp, colorClass: "text-rose-400 bg-rose-400/10" },
+    { title: "CPL", value: realTotals.leads > 0 ? formatCurrency(realTotals.cpl) : "-", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
+    { title: "CPMQL", value: realTotals.mqls > 0 ? formatCurrency(realTotals.cpmql) : "-", icon: TrendingUp, colorClass: "text-rose-400 bg-rose-400/10" },
     { title: "CPM", value: formatCurrency(totals.cpm), icon: DollarSign, colorClass: "text-slate-400 bg-slate-400/10" },
     { title: "CPC", value: formatCurrency(totals.cpc), icon: MousePointerClick, colorClass: "text-violet-400 bg-violet-400/10" },
     { title: "Conv. LP", value: formatPercent(totals.lpConvRate), subtitle: "Leads / Pageviews", icon: BarChart3, colorClass: "text-green-400 bg-green-400/10" },
     { title: "Connect Rate", value: formatPercent(totals.connectRate), subtitle: "Leads / Cliques", icon: TrendingUp, colorClass: "text-pink-400 bg-pink-400/10" },
   ];
 
-  const realKpis = [
-    { title: "Leads Reais", value: formatNumber(realTotals.leads), subtitle: "Planilha", icon: Users, colorClass: "text-emerald-400 bg-emerald-400/10" },
-    { title: "MQLs Reais", value: formatNumber(realTotals.mqls), subtitle: "Planilha", icon: UserCheck, colorClass: "text-teal-400 bg-teal-400/10" },
-    { title: "CPL Real", value: realTotals.leads > 0 ? formatCurrency(realTotals.cpl) : "-", subtitle: "Invest. / Leads reais", icon: TrendingUp, colorClass: "text-amber-400 bg-amber-400/10" },
-    { title: "CPMQL Real", value: realTotals.mqls > 0 ? formatCurrency(realTotals.cpmql) : "-", subtitle: "Invest. / MQLs reais", icon: TrendingUp, colorClass: "text-orange-400 bg-orange-400/10" },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* KPIs Meta */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {kpis.map((kpi) => (
           <KPICard key={kpi.title} {...kpi} />
         ))}
       </div>
-
-      {/* KPIs Reais da Planilha */}
-      {hasSheetData && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <FileSpreadsheet className="w-4 h-4 text-green-400" />
-            <h2 className="text-sm font-semibold text-green-400">Métricas Reais — Google Sheets</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {realKpis.map((kpi) => (
-              <KPICard key={kpi.title} {...kpi} />
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PerformanceChart
