@@ -1,4 +1,4 @@
-import { metaFetch, META_AD_ACCOUNT_ID } from "./client";
+import { metaFetchAll, META_AD_ACCOUNT_ID } from "./client";
 import { format, subDays } from "date-fns";
 
 export interface MetaInsight {
@@ -77,12 +77,7 @@ export async function fetchInsights(params: {
     });
   }
 
-  const result = await metaFetch<{
-    data: MetaInsight[];
-    paging?: { next?: string };
-  }>(endpoint, queryParams);
-
-  return result.data;
+  return metaFetchAll<MetaInsight>(endpoint, queryParams);
 }
 
 export async function fetchYesterdayInsights(
