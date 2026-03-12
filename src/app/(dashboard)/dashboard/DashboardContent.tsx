@@ -16,6 +16,7 @@ import {
   parseInsightMetrics,
   type DatePreset,
 } from "@/lib/meta/insights";
+import { fetchCampaigns } from "@/lib/meta/campaigns";
 import { fetchSheetLeads, periodToDateRange, normalizeSheetName } from "@/lib/sheets";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
@@ -29,13 +30,17 @@ async function getDashboardData(period: string, since?: string, until?: string, 
     : periodToDateRange(period);
 
   // Buscar dados do Meta e da planilha em paralelo
-  const [insightsRaw, sheetMap] = await Promise.all([
+  const [insightsRaw, campaignsList, sheetMap] = await Promise.all([
     fetchInsights({
       level: "campaign",
       ...(isCustom ? { since, until } : { datePreset }),
     }),
+    fetchCampaigns(),
     fetchSheetLeads(dateRange.since, dateRange.until),
   ]);
+
+  // Mapa de campaign_id → effective_status
+  const statusMap = new Map(campaignsList.map((c) => [c.id, c.effective_status]));
 
   let insights = insightsRaw;
   if (campaignIds && campaignIds.length > 0) {
@@ -83,7 +88,7 @@ async function getDashboardData(period: string, since?: string, until?: string, 
         pageView: existing.pageView + m.pageView,
       });
     } else {
-      campaignMap.set(id, { ...m, id, name: insight.campaign_name ?? id, status: "ACTIVE" });
+      campaignMap.set(id, { ...m, id, name: insight.campaign_name ?? id, status: statusMap.get(id) ?? "ACTIVE" });
     }
   }
 
