@@ -89,8 +89,10 @@ async function getDashboardData(period: string, since?: string, until?: string, 
 
   const campaigns = Array.from(campaignMap.values()).map((c: any) => {
     // Buscar dados reais da planilha pelo nome normalizado
+    // Tenta match exato; se não achar, remove sufixos como "— cópia", "- copia", etc.
     const normalizedName = normalizeSheetName(c.name);
-    const sheet = sheetMap.get(normalizedName);
+    const cleanedName = normalizedName.replace(/\s*[—–-]+\s*(c[oó]pia|copy)\s*$/i, "").trim();
+    const sheet = sheetMap.get(normalizedName) ?? sheetMap.get(cleanedName);
     const realLeads = sheet?.leads ?? 0;
     const realMqls = sheet?.mqls ?? 0;
 
@@ -110,9 +112,13 @@ async function getDashboardData(period: string, since?: string, until?: string, 
     };
   });
 
-  // Totais reais da planilha
-  const totalRealLeads = campaigns.reduce((s, c) => s + c.realLeads, 0);
-  const totalRealMqls = campaigns.reduce((s, c) => s + c.realMqls, 0);
+  // Totais reais da planilha — soma TODOS os leads do período, independente de match com Meta
+  let totalRealLeads = 0;
+  let totalRealMqls = 0;
+  for (const v of sheetMap.values()) {
+    totalRealLeads += v.leads;
+    totalRealMqls += v.mqls;
+  }
   const realCpl = totalRealLeads > 0 ? totals.spend / totalRealLeads : 0;
   const realCpmql = totalRealMqls > 0 ? totals.spend / totalRealMqls : 0;
 
