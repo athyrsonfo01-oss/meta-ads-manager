@@ -32,6 +32,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Rotas exclusivas de admin → redireciona para dashboard
+  const adminOnlyRoutes = ["/settings"];
+  if (adminOnlyRoutes.some((r) => pathname.startsWith(r)) && session?.role !== "admin") {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   return NextResponse.next();
 }
 

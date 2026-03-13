@@ -8,6 +8,7 @@ export async function PATCH(
 ) {
   const session = await requireAuth();
   if (!session) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  if (session.role !== "admin") return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
 
   try {
     const body = await req.json();

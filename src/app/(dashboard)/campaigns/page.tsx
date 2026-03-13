@@ -5,6 +5,7 @@ import { Plus, RefreshCw, Loader2, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { CreateCampaignModal } from "./CreateCampaignModal";
+import { useSession } from "@/lib/auth-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -278,6 +279,8 @@ function MetricCells({ ins }: { ins?: Insight }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
+  const { role } = useSession();
+  const isAdmin = role === "admin";
   const [tab, setTab] = useState<Tab>("campaigns");
   const [period, setPeriod] = useState("last_7d");
   const [showModal, setShowModal] = useState(false);
@@ -580,10 +583,12 @@ export default function CampaignsPage() {
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
-          <Button size="sm" onClick={() => setShowModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Campanha
-          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={() => setShowModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Campanha
+            </Button>
+          )}
         </div>
       </div>
 
@@ -655,8 +660,8 @@ export default function CampaignsPage() {
                           <div className="flex items-center gap-2">
                             <Toggle
                               checked={isActive}
-                              onChange={() => toggleCampaign(c.id, status)}
-                              disabled={togglingIds.has(c.id)}
+                              onChange={() => isAdmin && toggleCampaign(c.id, status)}
+                              disabled={!isAdmin || togglingIds.has(c.id)}
                             />
                             <span className={`text-xs ${isActive ? "text-emerald-500" : "text-muted-foreground"}`}>
                               {isActive ? "Ativo" : "Pausado"}
@@ -665,13 +670,17 @@ export default function CampaignsPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{c.objective}</td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setEditingBudget({ id: c.id, name: c.name, current: budget, type: "daily" })}
-                            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground group transition-colors"
-                          >
-                            <span>{budget ? formatCurrency(budget) : "—"}</span>
-                            <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                          </button>
+                          {isAdmin ? (
+                            <button
+                              onClick={() => setEditingBudget({ id: c.id, name: c.name, current: budget, type: "daily" })}
+                              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground group transition-colors"
+                            >
+                              <span>{budget ? formatCurrency(budget) : "—"}</span>
+                              <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground">{budget ? formatCurrency(budget) : "—"}</span>
+                          )}
                         </td>
                         <MetricCells ins={campaignInsights[c.id]} />
                       </tr>
@@ -739,7 +748,8 @@ export default function CampaignsPage() {
                           <div className="flex items-center gap-2">
                             <Toggle
                               checked={isActive}
-                              onChange={() => toggleAdset(a.id, status)}
+                              onChange={() => isAdmin && toggleAdset(a.id, status)}
+                              disabled={!isAdmin}
                             />
                             <span className={`text-xs ${isActive ? "text-emerald-500" : "text-muted-foreground"}`}>
                               {isActive ? "Ativo" : "Pausado"}
@@ -748,13 +758,17 @@ export default function CampaignsPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{a.optimization_goal}</td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setEditingBudget({ id: a.id, name: a.name, current: budget, type: "daily" })}
-                            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground group transition-colors"
-                          >
-                            <span>{budget ? formatCurrency(budget) : "—"}</span>
-                            <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                          </button>
+                          {isAdmin ? (
+                            <button
+                              onClick={() => setEditingBudget({ id: a.id, name: a.name, current: budget, type: "daily" })}
+                              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground group transition-colors"
+                            >
+                              <span>{budget ? formatCurrency(budget) : "—"}</span>
+                              <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground">{budget ? formatCurrency(budget) : "—"}</span>
+                          )}
                         </td>
                         <MetricCells ins={adsetInsights[a.id]} />
                       </tr>
@@ -801,7 +815,8 @@ export default function CampaignsPage() {
                           <div className="flex items-center gap-2">
                             <Toggle
                               checked={isActive}
-                              onChange={() => toggleAd(a.id, status)}
+                              onChange={() => isAdmin && toggleAd(a.id, status)}
+                              disabled={!isAdmin}
                             />
                             <span className={`text-xs ${isActive ? "text-emerald-500" : "text-muted-foreground"}`}>
                               {isActive ? "Ativo" : "Pausado"}

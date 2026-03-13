@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth-context";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,6 +43,8 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const { role } = useSession();
+  const isAdmin = role === "admin";
 
   return (
     <aside
@@ -109,18 +112,20 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Footer */}
       <div className={cn("py-4 border-t border-border space-y-1", collapsed ? "px-2" : "px-3")}>
-        <Link
-          href="/settings"
-          onClick={onMobileClose}
-          title={collapsed ? "Configurações" : undefined}
-          className={cn(
-            "flex items-center gap-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
-            collapsed ? "md:justify-center md:px-2 md:py-2.5 px-3 py-2.5" : "px-3 py-2.5"
-          )}
-        >
-          <Settings className="w-4 h-4 flex-shrink-0" />
-          <span className={cn(collapsed && "md:hidden")}>Configurações</span>
-        </Link>
+        {isAdmin && (
+          <Link
+            href="/settings"
+            onClick={onMobileClose}
+            title={collapsed ? "Configurações" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
+              collapsed ? "md:justify-center md:px-2 md:py-2.5 px-3 py-2.5" : "px-3 py-2.5"
+            )}
+          >
+            <Settings className="w-4 h-4 flex-shrink-0" />
+            <span className={cn(collapsed && "md:hidden")}>Configurações</span>
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           title={collapsed ? "Sair" : undefined}
